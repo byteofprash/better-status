@@ -6,7 +6,7 @@ import type { UserRecord } from './types.ts';
 
 export const appUrl = () => {
   const u = env('APP_URL');
-  if (!u) throw new Error('APP_URL must be set (e.g. https://better-status.vercel.app)');
+  if (!u) throw new Error('APP_URL must be set (e.g. https://better-status.example.workers.dev)');
   return u.replace(/\/$/, '');
 };
 
