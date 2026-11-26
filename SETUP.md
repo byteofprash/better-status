@@ -1,80 +1,79 @@
-# Setup guide
+# Deploying Better Status (admin guide)
 
-You need four things: a **Talon.One** key, a **Slack** user token, **Google** OAuth credentials,
-and the Talon.One configuration (attributes, custom effect, campaign — see the README).
-About 20 minutes the first time. Put every value in your own `.env`; never commit it.
+One deployment serves everyone. You configure the app once; each teammate then clicks
+**Connect Slack**, **Connect Google Calendar** and enters **their own Talon.One URL and Integration API key**.
 
-## 1. Talon.One
+## Environment variables (Vercel project settings)
 
-1. In the Campaign Manager, open your Application → **Settings → Integration API keys → Create key**.
-   Copy it into `TALON_IAPI_KEY`.
-2. `TALON_URL` is your deployment host, e.g. `mycompany.europe-west1.talon.one` (no `https://`).
-3. Create the attributes, the `setSlackStatus` custom effect and the campaign from the README.
-   Attributes and custom effects live under your account's developer tools. Create the
-   attributes *before* the first event, or Talon.One rejects them.
-
-Use a sandbox Application for the first run.
-
-## 2. Slack user token
-
-Better Status sets *your* status, so it uses a **user token**, not a bot token.
-
-1. Go to <https://api.slack.com/apps> → **Create New App → From scratch**. Name it
-   "Better Status" and pick your workspace.
-2. **OAuth & Permissions → User Token Scopes** → add `users.profile:read` and `users.profile:write`.
-   (Not "Bot Token Scopes".)
-3. **Install to Workspace**. If your workspace requires app approval, this sends a request to an admin;
-   wait for approval before continuing.
-4. Copy the **User OAuth Token** (starts with `xoxp-`) into `SLACK_USER_TOKEN`.
-
-The token can only change the status of the person who installed the app.
-
-## 3. Google Calendar credentials
-
-### 3a. Create the OAuth client
-1. In <https://console.cloud.google.com>, create (or pick) a project.
-2. **APIs & Services → Library** → enable **Google Calendar API**.
-3. **OAuth consent screen**: choose **Internal** if you use Google Workspace (recommended: refresh tokens don't
-   expire). With **External** in *Testing* mode, refresh tokens expire after 7 days and you must add yourself as a test user.
-   Add the scope `https://www.googleapis.com/auth/calendar.events.readonly`.
-4. **Credentials → Create credentials → OAuth client ID → Web application**. Add this authorized redirect URI:
-   `https://developers.google.com/oauthplayground`
-5. Copy the client ID and secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
-
-### 3b. Get a refresh token (one time)
-1. Open <https://developers.google.com/oauthplayground>.
-2. Click the gear icon → tick **Use your own OAuth credentials** → paste your client ID and secret.
-3. In the scope box enter `https://www.googleapis.com/auth/calendar.events.readonly` → **Authorize APIs** and sign in.
-4. **Exchange authorization code for tokens**. Copy the **Refresh token** into `GOOGLE_REFRESH_TOKEN`.
-
-The scope is read-only; Better Status never edits your calendar.
-
-## 4. First run
-
-```bash
-cp .env.example .env     # fill in the values above
-set -a; source .env; set +a
-npm run dry              # calls Talon.One, prints the result, leaves Slack alone
-```
-
-Start a test meeting on your calendar (or run during one) and check the log line, e.g.
-`"Acme sync" (external, one_on_one) -> :handshake: In an external 1:1`. Then:
-
-```bash
-npm run once             # also sets your Slack status
-npm start                # keep polling
-```
-
-## Troubleshooting
-
-| Symptom | Likely cause |
+| Variable | Value |
 |---|---|
-| `Missing required env var ...` | The variable isn't exported; re-run `set -a; source .env; set +a`. |
-| `Google token refresh failed: 400/401` | Wrong client secret, or an External/Testing refresh token older than 7 days. Redo 3b. |
-| `Google Calendar failed: 403` | Calendar API not enabled, or the scope wasn't granted. |
-| `Talon.One track event failed: 401` | Wrong key, or the key belongs to another Application. |
-| `Talon.One track event failed: 400` | An attribute doesn't exist yet, or the type is wrong (`startTime`/`endTime` must be *time*). |
-| `no rule matched` | The campaign is disabled, or no rule fires for this meeting. |
-| `Slack users.profile.set failed: missing_scope` | Add the scopes under **User** Token Scopes and reinstall the app. |
-| `Slack ... failed: not_allowed_token_type` | You used a bot token (`xoxb-`); use the user token (`xoxp-`). |
-| Status doesn't change | You have a manual status set; Better Status leaves those alone. Clear it once and retry. |
+| `APP_URL` | Production URL, no trailing slash, e.g. `https://better-status.vercel.app` |
+| `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` | From your Slack app |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | From your Google OAuth client |
+| `ENCRYPTION_KEY` | `openssl rand -base64 32`. Encrypts stored tokens. |
+| `SESSION_SECRET` | `openssl rand -base64 32` |
+| `CRON_SECRET` | `openssl rand -base64 32`. Vercel Cron sends it automatically. |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Added by the Upstash Redis integration |
+| `TALON_HOST_SUFFIXES` | Optional, default `.talon.one`. Which hosts users may enter (SSRF guard). |
+
+The Talon.One URL and Integration API key are **not** app settings: every user enters their own.
+Losing `ENCRYPTION_KEY` makes stored tokens unreadable (users would have to reconnect).
+
+## 1. Create the Vercel project
+1. Import this repo into Vercel. Its production URL is your `APP_URL`.
+2. **Storage → Marketplace → Upstash Redis** → connect it to the project.
+3. Add the environment variables above.
+
+## 2. Slack app
+1. <https://api.slack.com/apps> → **Create New App → From scratch**.
+2. **OAuth & Permissions**:
+   - **Redirect URLs** → add `APP_URL/api/auth/slack`.
+   - **User Token Scopes** → `users.profile:read`, `users.profile:write`. Add **no** bot scopes.
+3. Copy **Client ID** / **Client Secret** (Basic Information) into the env vars.
+4. If your workspace requires app approval, an admin approves it once. No Marketplace listing is needed
+   for internal use. (Enable *Manage Distribution* only if people outside your workspace will use it.)
+
+## 3. Google OAuth client
+1. In <https://console.cloud.google.com>: enable the **Google Calendar API**.
+2. **OAuth consent screen**: pick **Internal** (Google Workspace) so refresh tokens don't expire.
+   Add the scope `https://www.googleapis.com/auth/calendar.events.readonly`.
+   (A public **External** app needs Google verification for this scope.)
+3. **Credentials → OAuth client ID → Web application** with the redirect URI `APP_URL/api/auth/google`.
+4. Put the client ID/secret into the env vars.
+
+## 4. The scheduler
+Serverless functions only run when called, and Google Calendar has no "meeting started" webhook
+(its push notifications fire on event *changes* only), so a clock is needed.
+`vercel.json` runs `/api/cron/sync` **every minute**. Per-minute cron needs the Vercel **Pro** plan;
+on Hobby the deploy is rejected. On Hobby: delete the `crons` block and have any pinger (e.g. cron-job.org,
+or an Apps Script time trigger) call `GET APP_URL/api/cron/sync` every minute with the header
+`Authorization: Bearer <CRON_SECRET>`.
+
+Each run handles users in batches of 10 within a 50-second budget, which is plenty for a team.
+For hundreds of users, fan out per user (queue) instead.
+
+## 5. Redeploy and check
+Visit `APP_URL` and connect your own account first. **Test connection** sends a *dry-run* event, so nothing is
+written to Talon.One or Slack.
+
+## Security notes
+- All per-user data (Slack token, Google refresh token, Talon URL and key) is stored as one AES-256-GCM
+  encrypted blob. The key is never shown again after saving, only its last 4 characters.
+- Users may only enter `https://*.talon.one` hosts, and redirects are refused.
+- **Disconnect & delete my data** revokes the Slack and Google tokens and deletes the record.
+- Scopes: Slack `users.profile:read/write` (own profile only), Google Calendar **read-only**.
+- Talon.One receives only: event title, start/end, internal/external, participant count and a hashed
+  profile ID. No attendee emails.
+
+## Local single-user mode
+Skips Vercel, Redis and OAuth apps. Export these and run `npm run dry` (calls Talon.One only), `npm run once`
+or `npm run cli` (polls):
+
+```bash
+export SLACK_USER_TOKEN=xoxp-...  GOOGLE_CLIENT_ID=...  GOOGLE_CLIENT_SECRET=...  GOOGLE_REFRESH_TOKEN=...
+export TALON_URL=mycompany.europe-west1.talon.one  TALON_IAPI_KEY=...  INTERNAL_DOMAIN=talon.one
+```
+
+Getting a Google refresh token for yourself: use the OAuth Playground with your own client
+(<https://developers.google.com/oauthplayground>, gear icon → "Use your own OAuth credentials",
+scope `https://www.googleapis.com/auth/calendar.events.readonly`).

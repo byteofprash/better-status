@@ -1,3 +1,4 @@
+import { talonHost } from './talonUrl.ts';
 import type { Meeting, SlackStatus } from './types.ts';
 
 export const EVENT_TYPE = 'meeting_started';
@@ -20,11 +21,13 @@ export async function evaluateMeeting(
   cfg: { talonUrl: string; talonKey: string },
   profileId: string,
   m: Meeting,
-  fetchImpl: typeof fetch = fetch,
+  opts: { dry?: boolean; fetchImpl?: typeof fetch } = {},
 ): Promise<SlackStatus | null> {
-  const host = cfg.talonUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const res = await fetchImpl(`https://${host}/v3/events`, {
+  const host = talonHost(cfg.talonUrl);
+  const res = await (opts.fetchImpl ?? fetch)(`https://${host}/v3/events${opts.dry ? '?dry=true' : ''}`, {
     method: 'POST',
+    redirect: 'error',
+    signal: AbortSignal.timeout(10_000),
     headers: { Authorization: `ApiKey-v1 ${cfg.talonKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       profileId,
@@ -40,6 +43,6 @@ export async function evaluateMeeting(
       },
     }),
   });
-  if (!res.ok) throw new Error(`Talon.One track event failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`Talon.One returned ${res.status}: ${(await res.text()).slice(0, 300)}`);
   return statusFromEffects(((await res.json()) as { effects?: Effect[] }).effects);
 }

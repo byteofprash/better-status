@@ -1,8 +1,9 @@
 import type { SlackStatus } from './types.ts';
 
-async function call(token: string, method: string, init: RequestInit & { query?: string }) {
-  const res = await fetch(`https://slack.com/api/${method}${init.query ?? ''}`, {
+async function call(token: string, method: string, init: RequestInit) {
+  const res = await fetch(`https://slack.com/api/${method}`, {
     ...init,
+    signal: AbortSignal.timeout(10_000),
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=utf-8' },
   });
   const body = (await res.json()) as { ok: boolean; error?: string; profile?: Record<string, unknown> };
@@ -12,10 +13,7 @@ async function call(token: string, method: string, init: RequestInit & { query?:
 
 export async function getStatus(token: string): Promise<{ text: string; emoji: string }> {
   const { profile } = await call(token, 'users.profile.get', { method: 'GET' });
-  return {
-    text: String(profile?.status_text ?? ''),
-    emoji: String(profile?.status_emoji ?? ''),
-  };
+  return { text: String(profile?.status_text ?? ''), emoji: String(profile?.status_emoji ?? '') };
 }
 
 export async function setStatus(token: string, s: SlackStatus | null, expiresAtIso?: string) {
@@ -23,11 +21,9 @@ export async function setStatus(token: string, s: SlackStatus | null, expiresAtI
   await call(token, 'users.profile.set', {
     method: 'POST',
     body: JSON.stringify({
-      profile: {
-        status_text: s?.text ?? '',
-        status_emoji: s?.emoji ?? '',
-        status_expiration: s ? expiration : 0,
-      },
+      profile: { status_text: s?.text ?? '', status_emoji: s?.emoji ?? '', status_expiration: s ? expiration : 0 },
     }),
   });
 }
+
+export const revoke = (token: string) => call(token, 'auth.revoke', { method: 'POST', body: '{}' });

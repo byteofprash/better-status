@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Google Calendar -> Talon.One rules -> Slack status",
-  "engines": { "node": ">=22.18" },
+  "description": "Google Calendar -> Talon.One rules -> Slack status (multi-user, hosted on Vercel)",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
-    "start": "node src/cli.ts",
-    "once": "node src/cli.ts --once",
+    "test": "node --test \"test/*.test.ts\"",
+    "cli": "node src/cli.ts",
     "dry": "node src/cli.ts --once --dry",
-    "test": "node --test \"test/*.test.ts\""
+    "once": "node src/cli.ts --once"
   }
 }

@@ -1,18 +1,23 @@
 # Better Status
 
-Google Calendar → **Talon.One rules** → Slack status.
+Google Calendar → **Talon.One rules** → Slack status, for you and your team.
 
 The service only reports *facts* about the meeting you're in. Talon.One decides what your
 status should be, so wording, emoji and priorities are edited in the Campaign Manager, not in code.
 
 ```
-Calendar ──▶ Better Status ──(POST /v3/events)──▶ Talon.One rules
-                  ▲                                     │
-                  └──── customEffect "setSlackStatus" ◀─┘
+Calendar ──▶ Better Status ──(POST /v3/events)──▶ your Talon.One rules
+                  ▲                                      │
+                  └──── customEffect "setSlackStatus" ◀──┘
 Better Status ──▶ Slack users.profile.set (text, emoji, expires at meeting end)
 ```
 
-## Talon.One setup (one-time, done in the Campaign Manager)
+## How teammates use it
+Open the app → **Connect Slack** → **Connect Google Calendar** → enter your own Talon.One URL and
+Integration API key → **Test connection**. Admins deploy it once: see [SETUP.md](SETUP.md)
+(Vercel + Upstash Redis).
+
+## Talon.One setup (each user, one time, in their Campaign Manager)
 
 **1. Attributes on the *Event* entity**
 
@@ -42,27 +47,18 @@ exist before the first event.)
 
 New here? Follow [SETUP.md](SETUP.md) for the Slack, Google and Talon.One credentials.
 
-## Run it
-
-Needs Node ≥ 22.18, no dependencies.
-
-```bash
-cp .env.example .env   # fill in, then export the variables (e.g. `set -a; source .env; set +a`)
-npm run dry            # one pass: calls Talon.One, prints the result, does NOT touch Slack
-npm run once           # one pass including Slack
-npm start              # poll every POLL_SECONDS (default 60)
-npm test
-```
-
-Config: `TALON_URL` + `TALON_IAPI_KEY` are the only Talon-specific settings. Slack and Google
-credentials are still needed to read the calendar and write the status.
-
 ## Behaviour
 
 - One Talon.One event per meeting (re)start. The event ID includes a fingerprint of the event, so
   an edited meeting is re-evaluated and an unchanged one is never sent twice.
 - Skipped: declined, cancelled, all-day and "free" events. Overlaps: the latest-started meeting wins.
-- `internal`/`external` is derived from attendee email domains; emails are **not** sent to
-  Talon.One. The profile ID is a hash of your email.
-- The status expires at the meeting's end, so it clears itself. A status you set by hand is never overwritten.
+- `internal`/`external` comes from attendee email domains; emails are **not** sent to Talon.One.
+  The profile ID is a hash of the Slack team/user ID.
+- The status expires at the meeting's end, so it clears itself. A status set by hand is never overwritten.
 - No rule matched → status left alone.
+- A scheduler (Vercel Cron, every minute) checks everyone's calendar; Google Calendar has no
+  "meeting started" webhook.
+
+## Development
+
+Node ≥ 22.18, no dependencies: `npm test`. Local single-user mode: see the end of [SETUP.md](SETUP.md).
