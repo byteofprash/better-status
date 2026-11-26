@@ -1,12 +1,12 @@
-import { revoke as slackRevoke } from '../src/slack.ts';
-import { deleteUser, saveUser } from '../src/store.ts';
-import { dashboard } from '../src/pages.ts';
-import { profileIdFor } from '../src/sync.ts';
-import { evaluateMeeting } from '../src/talon.ts';
-import { talonHost } from '../src/talonUrl.ts';
-import { currentUser, endSession, page, redirect, sameOrigin } from '../src/web.ts';
+import { dashboard } from '../pages.ts';
+import { revoke as slackRevoke } from '../slack.ts';
+import { deleteUser, saveUser } from '../store.ts';
+import { profileIdFor } from '../sync.ts';
+import { evaluateMeeting } from '../talon.ts';
+import { talonHost } from '../talonUrl.ts';
+import { currentUser, endSession, page, redirect, sameOrigin } from '../web.ts';
 
-export async function POST(req: Request) {
+export async function settings(req: Request) {
   if (!sameOrigin(req)) return new Response('Forbidden', { status: 403 });
   const user = await currentUser(req);
   if (!user) return redirect('/');

@@ -1,9 +1,10 @@
-import { saveUser } from '../../src/store.ts';
-import { appUrl, checkState, clearState, currentUser, newState, redirect } from '../../src/web.ts';
+import { env } from '../env.ts';
+import { saveUser } from '../store.ts';
+import { appUrl, checkState, clearState, currentUser, newState, redirect } from '../web.ts';
 
 const SCOPE = 'https://www.googleapis.com/auth/calendar.events.readonly';
 
-export async function GET(req: Request) {
+export async function googleAuth(req: Request) {
   const user = await currentUser(req);
   if (!user) return redirect('/?error=Connect%20Slack%20first');
   const q = new URL(req.url).searchParams;
@@ -13,7 +14,7 @@ export async function GET(req: Request) {
     if (q.has('error')) return redirect('/');
     const { state, setCookie } = newState();
     const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    url.searchParams.set('client_id', process.env.GOOGLE_CLIENT_ID!);
+    url.searchParams.set('client_id', env('GOOGLE_CLIENT_ID')!);
     url.searchParams.set('redirect_uri', redirectUri);
     url.searchParams.set('response_type', 'code');
     url.searchParams.set('scope', SCOPE);
@@ -29,8 +30,8 @@ export async function GET(req: Request) {
     signal: AbortSignal.timeout(10_000),
     body: new URLSearchParams({
       code: q.get('code')!,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      client_id: env('GOOGLE_CLIENT_ID')!,
+      client_secret: env('GOOGLE_CLIENT_SECRET')!,
       redirect_uri: redirectUri,
       grant_type: 'authorization_code',
     }),

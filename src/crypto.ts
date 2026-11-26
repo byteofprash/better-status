@@ -1,28 +1,27 @@
-import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { env } from './env.ts';
 
-function key(): Buffer {
-  const k = Buffer.from(process.env.ENCRYPTION_KEY ?? '', 'base64');
-  if (k.length !== 32) throw new Error('ENCRYPTION_KEY must be 32 bytes, base64 encoded (openssl rand -base64 32)');
-  return k;
+async function aesKey(usage: 'encrypt' | 'decrypt'): Promise<CryptoKey> {
+  const raw = Buffer.from(env('ENCRYPTION_KEY') ?? '', 'base64');
+  if (raw.length !== 32) throw new Error('ENCRYPTION_KEY must be 32 bytes, base64 encoded (openssl rand -base64 32)');
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, [usage]);
 }
 
-/** AES-256-GCM. Output: base64(iv | tag | ciphertext). */
-export function encrypt(plain: string): string {
-  const iv = randomBytes(12);
-  const c = createCipheriv('aes-256-gcm', key(), iv);
-  const ct = Buffer.concat([c.update(plain, 'utf8'), c.final()]);
-  return Buffer.concat([iv, c.getAuthTag(), ct]).toString('base64');
+/** AES-256-GCM via WebCrypto. Output: base64(iv | ciphertext+tag). */
+export async function encrypt(plain: string): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await aesKey('encrypt'), new TextEncoder().encode(plain));
+  return Buffer.concat([iv, new Uint8Array(ct)]).toString('base64');
 }
 
-export function decrypt(blob: string): string {
+export async function decrypt(blob: string): Promise<string> {
   const b = Buffer.from(blob, 'base64');
-  const d = createDecipheriv('aes-256-gcm', key(), b.subarray(0, 12));
-  d.setAuthTag(b.subarray(12, 28));
-  return Buffer.concat([d.update(b.subarray(28)), d.final()]).toString('utf8');
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.subarray(0, 12) }, await aesKey('decrypt'), b.subarray(12));
+  return new TextDecoder().decode(pt);
 }
 
 const secret = () => {
-  const s = process.env.SESSION_SECRET;
+  const s = env('SESSION_SECRET');
   if (!s || s.length < 16) throw new Error('SESSION_SECRET must be set (openssl rand -base64 32)');
   return s;
 };
@@ -46,9 +45,3 @@ export function verify<T>(token: string | undefined): T | null {
     return null;
   }
 }
-
-export const safeEqual = (a: string, b: string) => {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
-  return x.length === y.length && timingSafeEqual(x, y);
-};

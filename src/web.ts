@@ -1,10 +1,11 @@
 import { randomBytes } from 'node:crypto';
+import { env } from './env.ts';
 import { sign, verify } from './crypto.ts';
 import { loadUser } from './store.ts';
 import type { UserRecord } from './types.ts';
 
 export const appUrl = () => {
-  const u = process.env.APP_URL;
+  const u = env('APP_URL');
   if (!u) throw new Error('APP_URL must be set (e.g. https://better-status.vercel.app)');
   return u.replace(/\/$/, '');
 };

@@ -26,7 +26,7 @@ export async function evaluateMeeting(
   const host = talonHost(cfg.talonUrl);
   const res = await (opts.fetchImpl ?? fetch)(`https://${host}/v3/events${opts.dry ? '?dry=true' : ''}`, {
     method: 'POST',
-    redirect: 'error',
+    redirect: 'manual',
     signal: AbortSignal.timeout(10_000),
     headers: { Authorization: `ApiKey-v1 ${cfg.talonKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({

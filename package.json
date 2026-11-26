@@ -3,14 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Google Calendar -> Talon.One rules -> Slack status (multi-user, hosted on Vercel)",
+  "description": "Google Calendar -> Talon.One rules -> Slack status (multi-user, on Cloudflare Workers)",
   "engines": {
-    "node": "22.x"
+    "node": ">=22.18"
   },
   "scripts": {
     "test": "node --test \"test/*.test.ts\"",
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply better-status --remote",
     "cli": "node src/cli.ts",
     "dry": "node src/cli.ts --once --dry",
     "once": "node src/cli.ts --once"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
   }
 }

@@ -15,7 +15,7 @@ Better Status ──▶ Slack users.profile.set (text, emoji, expires at meeting
 ## How teammates use it
 Open the app → **Connect Slack** → **Connect Google Calendar** → enter your own Talon.One URL and
 Integration API key → **Test connection**. Admins deploy it once: see [SETUP.md](SETUP.md)
-(Vercel + Upstash Redis).
+(Cloudflare Workers + D1 + Queues).
 
 ## Talon.One setup (each user, one time, in their Campaign Manager)
 
@@ -56,9 +56,10 @@ New here? Follow [SETUP.md](SETUP.md) for the Slack, Google and Talon.One creden
   The profile ID is a hash of the Slack team/user ID.
 - The status expires at the meeting's end, so it clears itself. A status set by hand is never overwritten.
 - No rule matched → status left alone.
-- A scheduler (Vercel Cron, every minute) checks everyone's calendar; Google Calendar has no
-  "meeting started" webhook.
+- A Cloudflare Cron Trigger runs every 5 minutes and fans everyone out to a queue; Google Calendar has no
+  "meeting started" webhook, so a clock is needed. A status can appear up to 5 minutes after a meeting starts
+  (usually seconds) and always clears at the meeting's end.
 
 ## Development
 
-Node ≥ 22.18, no dependencies: `npm test`. Local single-user mode: see the end of [SETUP.md](SETUP.md).
+Node ≥ 22.18. `npm test` (no network needed), `npm run dev` for the local Worker, `npm run deploy`. Local single-user mode: see the end of [SETUP.md](SETUP.md).

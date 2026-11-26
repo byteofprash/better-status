@@ -1,0 +1,28 @@
+name = "better-status"
+main = "src/worker.ts"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Public URL of this Worker (no trailing slash). Used for OAuth redirect URIs.
+# Update after the first deploy, or when you add a custom domain.
+[vars]
+APP_URL = "https://better-status.YOUR-SUBDOMAIN.workers.dev"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "better-status"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+migrations_dir = "migrations"
+
+[[queues.producers]]
+binding = "SYNC_QUEUE"
+queue = "better-status-sync"
+
+[[queues.consumers]]
+queue = "better-status-sync"
+max_batch_size = 1      # one message (10 users) per invocation
+max_concurrency = 10
+max_retries = 2

@@ -1,10 +1,11 @@
-import { loadUser, saveUser } from '../../src/store.ts';
-import { appUrl, checkState, clearState, newState, redirect, startSession } from '../../src/web.ts';
+import { env } from '../env.ts';
+import { loadUser, saveUser } from '../store.ts';
+import { appUrl, checkState, clearState, newState, redirect, startSession } from '../web.ts';
 
 const SCOPES = 'users.profile:read,users.profile:write';
 
 /** Start (no `code`) and callback (`code`) of Slack "Add to Slack", user scopes only. */
-export async function GET(req: Request) {
+export async function slackAuth(req: Request) {
   const q = new URL(req.url).searchParams;
   const redirectUri = `${appUrl()}/api/auth/slack`;
 
@@ -12,7 +13,7 @@ export async function GET(req: Request) {
     if (q.has('error')) return redirect('/?error=Slack%20connection%20was%20cancelled');
     const { state, setCookie } = newState();
     const url = new URL('https://slack.com/oauth/v2/authorize');
-    url.searchParams.set('client_id', process.env.SLACK_CLIENT_ID!);
+    url.searchParams.set('client_id', env('SLACK_CLIENT_ID')!);
     url.searchParams.set('user_scope', SCOPES);
     url.searchParams.set('redirect_uri', redirectUri);
     url.searchParams.set('state', state);
@@ -24,15 +25,14 @@ export async function GET(req: Request) {
     method: 'POST',
     signal: AbortSignal.timeout(10_000),
     body: new URLSearchParams({
-      client_id: process.env.SLACK_CLIENT_ID!,
-      client_secret: process.env.SLACK_CLIENT_SECRET!,
+      client_id: env('SLACK_CLIENT_ID')!,
+      client_secret: env('SLACK_CLIENT_SECRET')!,
       code: q.get('code')!,
       redirect_uri: redirectUri,
     }),
   });
   const body = (await res.json()) as {
     ok: boolean;
-    error?: string;
     team?: { id: string };
     authed_user?: { id: string; access_token?: string };
   };
