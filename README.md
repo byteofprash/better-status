@@ -40,6 +40,8 @@ matching rule. Suggested rules, in order:
 **4. Integration API key** for the application. (Event attributes are sent as-is, so they must
 exist before the first event.)
 
+New here? Follow [SETUP.md](SETUP.md) for the Slack, Google and Talon.One credentials.
+
 ## Run it
 
 Needs Node ≥ 22.18, no dependencies.
